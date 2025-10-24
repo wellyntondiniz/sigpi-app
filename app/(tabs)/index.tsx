@@ -1,9 +1,11 @@
+import * as ImagePicker from 'expo-image-picker';
 import { Link } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Image,
   Modal,
   Pressable,
   StyleSheet,
@@ -27,13 +29,15 @@ export default function ImoveisScreen() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  // Estado do formulário
   const emptyForm: Imovel = useMemo(
     () => ({ id: undefined, titulo: '', descricao: '', disponivel: true }),
     []
   );
   const [form, setForm] = useState<Imovel>(emptyForm);
   const [openForm, setOpenForm] = useState(false);
+
+  const [fotoLocalUri, setFotoLocalUri] = useState<string | undefined>();
+  const [fotoBase64, setFotoBase64]   = useState<string | undefined>();
 
   async function load() {
     try {
@@ -53,6 +57,7 @@ export default function ImoveisScreen() {
 
   function onAdd() {
     setForm(emptyForm);
+    setFotoLocalUri(undefined);
     setOpenForm(true);
   }
 
@@ -63,6 +68,7 @@ export default function ImoveisScreen() {
       descricao: item.descricao ?? '',
       disponivel: !!item.disponivel,
     });
+    setFotoLocalUri(undefined); 
     setOpenForm(true);
   }
 
@@ -85,6 +91,41 @@ export default function ImoveisScreen() {
     ]);
   }
 
+async function pickImage() {
+  try {
+    const perm = await ImagePicker.requestCameraPermissionsAsync();
+    if (perm.status !== 'granted') {
+      Alert.alert('Permissão necessária', 'Ative o acesso à câmera.');
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 0.8,
+      aspect: [4, 3],
+      base64: true,          
+    });
+
+    if (result.canceled) return;
+
+    const asset = result.assets?.[0];
+    if (!asset) {
+      Alert.alert('Erro', 'Não foi possível obter a imagem.');
+      return;
+    }
+
+    setFotoLocalUri(asset.uri);
+    setFotoBase64(asset.base64 ?? undefined); // pode vir undefined no Web
+  } catch (e: any) {
+    Alert.alert('Erro', e?.message ?? 'Falha ao abrir câmera');
+  }
+}
+
+  function removeImage() {
+    setFotoLocalUri(undefined);
+  }
+
   async function onSubmit() {
     if (!form.titulo || form.titulo.trim().length === 0) {
       Alert.alert('Validação', 'Informe um título.');
@@ -92,9 +133,15 @@ export default function ImoveisScreen() {
     }
     try {
       setSaving(true);
-      await salvarImovel(form); // POST cria/atualiza
+      await salvarImovel(form, {
+        fotoBase64,               
+        fotoUri: fotoLocalUri,   
+        mime: 'image/jpeg',
+        nome: `imovel_${Date.now()}.jpg`,
+      });
       setOpenForm(false);
       setForm(emptyForm);
+      setFotoLocalUri(undefined);
       await load();
     } catch (e: any) {
       Alert.alert('Erro', e?.message ?? 'Falha ao salvar');
@@ -197,6 +244,30 @@ export default function ImoveisScreen() {
               />
             </View>
 
+            {/* Foto */}
+            <ThemedText style={styles.label}>Foto do imóvel</ThemedText>
+            {fotoLocalUri ? (
+              <View style={{ gap: 8 }}>
+                <Image
+                  source={{ uri: fotoLocalUri }}
+                  style={{ width: '100%', height: 180, borderRadius: 10 }}
+                  resizeMode="cover"
+                />
+                <View style={{ flexDirection: 'row', gap: 10 }}>
+                  <Pressable onPress={pickImage} style={styles.secondaryBtn}>
+                    <ThemedText style={styles.btnText}>Trocar foto</ThemedText>
+                  </Pressable>
+                  <Pressable onPress={removeImage} style={styles.dangerBtn}>
+                    <ThemedText style={styles.btnText}>Remover</ThemedText>
+                  </Pressable>
+                </View>
+              </View>
+            ) : (
+              <Pressable onPress={pickImage} style={[styles.primaryBtn, { alignSelf: 'flex-start' }]}>
+                <ThemedText style={styles.btnText}>Selecionar foto</ThemedText>
+              </Pressable>
+            )}
+
             <View style={styles.modalActions}>
               <Pressable
                 onPress={() => setOpenForm(false)}
@@ -247,7 +318,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 10,
-    backgroundColor: '#2563eb', // azul padrão; pode trocar para seu tema
+    backgroundColor: '#2563eb',
   },
   secondaryBtn: {
     paddingHorizontal: 12,
