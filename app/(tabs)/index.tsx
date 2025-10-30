@@ -1,358 +1,183 @@
-import * as ImagePicker from 'expo-image-picker';
-import { Link } from 'expo-router';
-import React, { useEffect, useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  Image,
-  Modal,
-  Pressable,
-  StyleSheet,
-  Switch,
-  TextInput,
-  View,
-} from 'react-native';
-
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+//import { getImoveis, getProximasParcelas, Imovel, Parcela } from '@/services/api';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
-import {
-  deletarImovel,
-  Imovel,
-  listarImoveis,
-  salvarImovel,
-} from '@/service/imovel';
-
-export default function ImoveisScreen() {
-  const [data, setData] = useState<Imovel[]>([]);
+export default function HomeScreen() {
+  const colorScheme = useColorScheme();
+  const [imoveis, setImoveis] = useState<Imovel[]>([]);
+  const [parcelas, setParcelas] = useState<Parcela[]>([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const emptyForm: Imovel = useMemo(
-    () => ({ id: undefined, titulo: '', descricao: '', disponivel: true }),
-    []
-  );
-  const [form, setForm] = useState<Imovel>(emptyForm);
-  const [openForm, setOpenForm] = useState(false);
-
-  const [fotoLocalUri, setFotoLocalUri] = useState<string | undefined>();
-  const [fotoBase64, setFotoBase64]   = useState<string | undefined>();
-
-  async function load() {
+  const carregar = useCallback(async () => {
+    setError(null);
     try {
-      setLoading(true);
-      const res = await listarImoveis();
-      setData(res);
+      const [imv, parc] = await Promise.all([
+        getImoveis(),
+        getProximasParcelas(5), // ajuste o limite se quiser
+      ]);
+      setImoveis(imv);
+      setParcelas(parc);
     } catch (e: any) {
-      Alert.alert('Erro', e?.message ?? 'Falha ao carregar imóveis');
+      setError(e?.message ?? 'Erro ao carregar dados');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
-  }
-
-  useEffect(() => {
-    load();
   }, []);
 
-  function onAdd() {
-    setForm(emptyForm);
-    setFotoLocalUri(undefined);
-    setOpenForm(true);
-  }
+  useEffect(() => {
+    carregar();
+  }, [carregar]);
 
-  function onEdit(item: Imovel) {
-    setForm({
-      id: item.id,
-      titulo: item.titulo ?? '',
-      descricao: item.descricao ?? '',
-      disponivel: !!item.disponivel,
-    });
-    setFotoLocalUri(undefined); 
-    setOpenForm(true);
-  }
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    carregar();
+  }, [carregar]);
 
-  async function onDelete(id?: number) {
-    if (!id) return;
-    Alert.alert('Excluir imóvel', 'Tem certeza que deseja excluir?', [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Excluir',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await deletarImovel(id);
-            await load();
-          } catch (e: any) {
-            Alert.alert('Erro', e?.message ?? 'Falha ao excluir');
-          }
-        },
-      },
-    ]);
-  }
-
-async function pickImage() {
-  try {
-    const perm = await ImagePicker.requestCameraPermissionsAsync();
-    if (perm.status !== 'granted') {
-      Alert.alert('Permissão necessária', 'Ative o acesso à câmera.');
-      return;
-    }
-
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      quality: 0.8,
-      aspect: [4, 3],
-      base64: true,          
-    });
-
-    if (result.canceled) return;
-
-    const asset = result.assets?.[0];
-    if (!asset) {
-      Alert.alert('Erro', 'Não foi possível obter a imagem.');
-      return;
-    }
-
-    setFotoLocalUri(asset.uri);
-    setFotoBase64(asset.base64 ?? undefined); // pode vir undefined no Web
-  } catch (e: any) {
-    Alert.alert('Erro', e?.message ?? 'Falha ao abrir câmera');
-  }
-}
-
-  function removeImage() {
-    setFotoLocalUri(undefined);
-  }
-
-  async function onSubmit() {
-    if (!form.titulo || form.titulo.trim().length === 0) {
-      Alert.alert('Validação', 'Informe um título.');
-      return;
-    }
-    try {
-      setSaving(true);
-      await salvarImovel(form, {
-        fotoBase64,               
-        fotoUri: fotoLocalUri,   
-        mime: 'image/jpeg',
-        nome: `imovel_${Date.now()}.jpg`,
-      });
-      setOpenForm(false);
-      setForm(emptyForm);
-      setFotoLocalUri(undefined);
-      await load();
-    } catch (e: any) {
-      Alert.alert('Erro', e?.message ?? 'Falha ao salvar');
-    } finally {
-      setSaving(false);
-    }
-  }
+  const { total, alugados, disponiveis } = useMemo(() => {
+    const t = imoveis.length;
+    const a = imoveis.filter(i => i.status === 'ALUGADO').length;
+    const d = t - a;
+    return { total: t, alugados: a, disponiveis: d };
+  }, [imoveis]);
 
   if (loading) {
     return (
       <ThemedView style={styles.center}>
         <ActivityIndicator />
+        <ThemedText style={{ marginTop: 8 }}>Carregando...</ThemedText>
       </ThemedView>
     );
   }
 
   return (
     <ThemedView style={styles.container}>
-      <View style={styles.header}>
-        <ThemedText type="title">Imóveis</ThemedText>
-        <Pressable onPress={onAdd} style={styles.primaryBtn}>
-          <ThemedText style={styles.btnText}>+ Novo</ThemedText>
-        </Pressable>
+      <ThemedText type="title" style={styles.title}>Início</ThemedText>
+
+      {error && (
+        <View style={[styles.card, styles.errorCard]}>
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+      )}
+
+      {/* Resumo de imóveis */}
+      <View style={styles.grid}>
+        <StatCard label="Imóveis" value={total} />
+        <StatCard label="Alugados" value={alugados} />
+        <StatCard label="Disponíveis" value={disponiveis} />
       </View>
 
-      <FlatList
-        data={data}
-        keyExtractor={(item) => String(item.id)}
-        ItemSeparatorComponent={() => <View style={styles.sep} />}
-        renderItem={({ item }) => (
-          <View style={styles.card}>
-            <View style={{ flex: 1 }}>
-              <ThemedText type="defaultSemiBold">{item.titulo}</ThemedText>
-              {!!item.descricao && (
-                <ThemedText numberOfLines={2} style={{ opacity: 0.8 }}>
-                  {item.descricao}
-                </ThemedText>
-              )}
-              <ThemedText style={{ marginTop: 4 }}>
-                {item.disponivel ? 'Disponível' : 'Indisponível'}
-              </ThemedText>
-            </View>
+      {/* Próximas parcelas */}
+      <View style={styles.card}>
+        <ThemedText type="subtitle" style={{ marginBottom: 8 }}>
+          Próximas parcelas a receber
+        </ThemedText>
 
-            <View style={styles.actions}>
-              <Pressable onPress={() => onEdit(item)} style={styles.secondaryBtn}>
-                <ThemedText style={styles.btnText}>Editar</ThemedText>
-              </Pressable>
-              <Pressable onPress={() => onDelete(item.id)} style={styles.dangerBtn}>
-                <ThemedText style={styles.btnText}>Excluir</ThemedText>
-              </Pressable>
-            </View>
-          </View>
+        {parcelas.length === 0 ? (
+          <ThemedText>Nenhuma parcela a receber.</ThemedText>
+        ) : (
+          <FlatList
+            data={parcelas}
+            keyExtractor={(item) => String(item.id)}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+            }
+            ItemSeparatorComponent={() => <View style={styles.separator} />}
+            renderItem={({ item }) => <ParcelaItem item={item} />}
+          />
         )}
-        ListEmptyComponent={
-          <View style={styles.center}>
-            <ThemedText>Nenhum imóvel cadastrado.</ThemedText>
-          </View>
-        }
-      />
-
-      <Link href="/" dismissTo style={styles.link}>
-        <ThemedText type="link">Voltar para Home</ThemedText>
-      </Link>
-
-      {/* Modal de Formulário */}
-      <Modal
-        visible={openForm}
-        animationType="slide"
-        onRequestClose={() => setOpenForm(false)}
-        transparent
-      >
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
-            <ThemedText type="subtitle">
-              {form.id ? 'Editar Imóvel' : 'Novo Imóvel'}
-            </ThemedText>
-
-            <ThemedText style={styles.label}>Título</ThemedText>
-            <TextInput
-              placeholder="Ex.: Casa 3 quartos"
-              value={form.titulo ?? ''}
-              onChangeText={(t) => setForm((s) => ({ ...s, titulo: t }))}
-              style={styles.input}
-            />
-
-            <ThemedText style={styles.label}>Descrição</ThemedText>
-            <TextInput
-              placeholder="Descreva o imóvel"
-              value={form.descricao ?? ''}
-              onChangeText={(t) => setForm((s) => ({ ...s, descricao: t }))}
-              style={[styles.input, { height: 80 }]}
-              multiline
-            />
-
-            <View style={styles.switchRow}>
-              <ThemedText>Disponível</ThemedText>
-              <Switch
-                value={!!form.disponivel}
-                onValueChange={(v) => setForm((s) => ({ ...s, disponivel: v }))}
-              />
-            </View>
-
-            {/* Foto */}
-            <ThemedText style={styles.label}>Foto do imóvel</ThemedText>
-            {fotoLocalUri ? (
-              <View style={{ gap: 8 }}>
-                <Image
-                  source={{ uri: fotoLocalUri }}
-                  style={{ width: '100%', height: 180, borderRadius: 10 }}
-                  resizeMode="cover"
-                />
-                <View style={{ flexDirection: 'row', gap: 10 }}>
-                  <Pressable onPress={pickImage} style={styles.secondaryBtn}>
-                    <ThemedText style={styles.btnText}>Trocar foto</ThemedText>
-                  </Pressable>
-                  <Pressable onPress={removeImage} style={styles.dangerBtn}>
-                    <ThemedText style={styles.btnText}>Remover</ThemedText>
-                  </Pressable>
-                </View>
-              </View>
-            ) : (
-              <Pressable onPress={pickImage} style={[styles.primaryBtn, { alignSelf: 'flex-start' }]}>
-                <ThemedText style={styles.btnText}>Selecionar foto</ThemedText>
-              </Pressable>
-            )}
-
-            <View style={styles.modalActions}>
-              <Pressable
-                onPress={() => setOpenForm(false)}
-                style={[styles.secondaryBtn, { flex: 1 }]}
-                disabled={saving}
-              >
-                <ThemedText style={styles.btnText}>Cancelar</ThemedText>
-              </Pressable>
-              <Pressable
-                onPress={onSubmit}
-                style={[styles.primaryBtn, { flex: 1 }]}
-                disabled={saving}
-              >
-                {saving ? (
-                  <ActivityIndicator />
-                ) : (
-                  <ThemedText style={styles.btnText}>
-                    {form.id ? 'Salvar' : 'Cadastrar'}
-                  </ThemedText>
-                )}
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      </View>
     </ThemedView>
   );
+}
+
+function StatCard({ label, value }: { label: string; value: number | string }) {
+  return (
+    <View style={styles.statCard}>
+      <Text style={styles.statValue}>{value}</Text>
+      <Text style={styles.statLabel}>{label}</Text>
+    </View>
+  );
+}
+
+function ParcelaItem({ item }: { item: Parcela }) {
+  return (
+    <View style={styles.parcelaRow}>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.parcelaTitulo}>
+          {item.imovelTitulo ?? `Imóvel #${item.imovelId}`}
+        </Text>
+        <Text style={styles.parcelaSub}>
+          {item.locatario ? `Locatário: ${item.locatario}` : '—'}
+        </Text>
+      </View>
+      <View style={{ alignItems: 'flex-end' }}>
+        <Text style={styles.parcelaValor}>
+          {formatCurrency(item.valor)}
+        </Text>
+        <Text style={styles.parcelaData}>
+          {formatDate(item.vencimento)}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+function formatCurrency(v: number) {
+  try {
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
+  } catch {
+    return `R$ ${v?.toFixed?.(2) ?? v}`;
+  }
+}
+
+function formatDate(iso: string) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString('pt-BR');
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 16, gap: 12 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  card: {
+  title: { marginBottom: 8 },
+  grid: {
     flexDirection: 'row',
     gap: 12,
-    alignItems: 'center',
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: StyleSheet.hairlineWidth,
+    flexWrap: 'wrap',
   },
-  actions: { gap: 8 },
-  sep: { height: 10 },
-  link: { marginTop: 15, paddingVertical: 15, alignSelf: 'center' },
-
-  // Botões
-  primaryBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 10,
-    backgroundColor: '#2563eb',
-  },
-  secondaryBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 10,
-    backgroundColor: '#6b7280',
-  },
-  dangerBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 10,
-    backgroundColor: '#dc2626',
-  },
-  btnText: { color: '#fff', fontWeight: '600' },
-
-  // Form
-  modalBackdrop: {
-    flex: 1, backgroundColor: 'rgba(0,0,0,0.35)',
-    alignItems: 'center', justifyContent: 'center', padding: 16,
-  },
-  modalCard: {
-    width: '100%',
+  statCard: {
+    flexBasis: '32%',
+    flexGrow: 1,
+    backgroundColor: '#ffffff10',
     borderRadius: 16,
     padding: 16,
-    gap: 10,
-    backgroundColor: 'white',
-  },
-  label: { marginTop: 4, marginBottom: 4 },
-  input: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 90,
     borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    borderColor: '#00000015',
   },
-  switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 },
-  modalActions: { flexDirection: 'row', gap: 10, marginTop: 8 },
+  statValue: { fontSize: 22, fontWeight: '700' },
+  statLabel: { fontSize: 12, opacity: 0.8, marginTop: 4 },
+  card: {
+    backgroundColor: '#ffffff10',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#00000015',
+  },
+  errorCard: { backgroundColor: '#ffdddd' },
+  errorText: { color: '#7a0000' },
+  parcelaRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8 },
+  parcelaTitulo: { fontWeight: '600' },
+  parcelaSub: { opacity: 0.7, fontSize: 12, marginTop: 2 },
+  parcelaValor: { fontWeight: '700' },
+  parcelaData: { opacity: 0.7, fontSize: 12, marginTop: 2 },
+  separator: { height: StyleSheet.hairlineWidth, backgroundColor: '#00000020', marginVertical: 6 },
 });

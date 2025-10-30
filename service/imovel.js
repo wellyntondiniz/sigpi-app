@@ -13,9 +13,10 @@ export interface Imovel {
   descricao?: string;
   disponivel?: boolean;
   imagemUrl?: string;
+  foto?: string;
 }
 
-const BASE_URL = 'http://192.168.68.110:4200/imovel'; 
+const BASE_URL = 'http://192.168.0.23:4200/imovel'; 
 
 async function toBase64(uri: string): Promise<string> {
   const manip = await ImageManipulator.manipulateAsync(
