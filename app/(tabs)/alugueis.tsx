@@ -1,20 +1,20 @@
-// app/alugueis.tsx
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { Aluguel, listarAlugueis } from '@/service/aluguel';
+//deletarAluguel salvarAluguel
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    Modal,
-    Pressable,
-    StyleSheet,
-    Switch,
-    Text,
-    TextInput,
-    View,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Modal,
+  Pressable,
+  StyleSheet,
+  Switch,
+  Text,
+  TextInput,
+  View,
 } from 'react-native';
-//import { Aluguel, listarAlugueis, salvarAluguel, deletarAluguel,} from '@/service/aluguel';
 
 function formatCurrency(v?: number) {
   if (v == null) return '';
@@ -156,9 +156,9 @@ export default function AlugueisScreen() {
           <View style={styles.card}>
             <View style={{ flex: 1 }}>
               <ThemedText type="defaultSemiBold">
-                {item.imovelTitulo ? `${item.imovelTitulo}` : `Imóvel #${item.imovelId}`}
+                {item.imovelId ? `${item.imovelId}` : `Imóvel #${item.imovelId}`}
               </ThemedText>
-              <Text style={{ opacity: 0.8 }}>Locatário: {item.locatario}</Text>
+              <Text style={{ opacity: 0.8 }}>Locatário: {item.inquilinoId}</Text>
               <Text style={{ marginTop: 4 }}>
                 {formatCurrency(item.valorMensal)} / mês
               </Text>
@@ -276,30 +276,119 @@ export default function AlugueisScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16, gap: 12 },
+  container: { flex: 1, padding: 16 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  sep: { height: 10 },
 
-  card: {
+  header: {
     flexDirection: 'row',
-    gap: 12,
     alignItems: 'center',
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: StyleSheet.hairlineWidth,
+    justifyContent: 'space-between',
+    marginBottom: 6,
   },
-  actions: { gap: 8 },
+  headerLeft: { flexDirection: 'row', alignItems: 'center' },
 
-  primaryBtn: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 10, backgroundColor: '#2563eb' },
-  secondaryBtn: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, backgroundColor: '#6b7280' },
-  dangerBtn: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, backgroundColor: '#dc2626' },
+  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10 },
+  thumb: {
+    width: 48,
+    height: 48,
+    borderRadius: 8,
+    marginRight: 12,
+    backgroundColor: '#e5e7eb',
+  },
+  thumbPlaceholder: { alignItems: 'center', justifyContent: 'center' },
+
+  rowBody: { flex: 1, minWidth: 0 },
+  rowTitle: { fontWeight: '700' },
+  rowSub: { opacity: 0.7, marginTop: 2, fontSize: 12 },
+  rowMeta: { marginTop: 6 },
+
+  rowActions: { flexDirection: 'row', alignItems: 'center', marginLeft: 8 },
+  iconCircle: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#e5e7eb',
+  },
+  hairline: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: '#e5e7eb',
+    marginLeft: 60,
+  },
+
+  pill: {
+    alignSelf: 'flex-start',
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  pillText: { fontSize: 11, fontWeight: '600' },
+
+  primaryBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: '#2563eb',
+  },
+  secondaryBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: '#6b7280',
+  },
+  dangerBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: '#dc2626',
+  },
   btnText: { color: '#fff', fontWeight: '600' },
 
-  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'center', justifyContent: 'center', padding: 16 },
-  modalCard: { width: '100%', borderRadius: 16, padding: 16, gap: 10, backgroundColor: 'white' },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+  },
+  modalCard: {
+    width: '100%',
+    borderRadius: 16,
+    padding: 16,
+    gap: 10,
+    backgroundColor: 'white',
+  },
   label: { marginTop: 4, marginBottom: 4 },
-  input: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10 },
-  switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 },
+  input: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  switchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 8,
+  },
   modalActions: { flexDirection: 'row', gap: 10, marginTop: 8 },
+
+  fab: {
+    position: 'absolute',
+    right: 16,
+    bottom: 24,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#2563eb',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 5,
+  },
 });

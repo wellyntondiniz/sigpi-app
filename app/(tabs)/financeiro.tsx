@@ -1,18 +1,17 @@
-// app/financeiro.tsx
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-//import { Parcela, deletarParcela, listarParcelasAReceber, receberParcela,  salvarParcela} from '@/service/financeiro';
+import { Parcela, listarParcelasVencendo } from '@/service/parcela';
 import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    Modal,
-    Pressable,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from 'react-native';
 
 function formatCurrency(v?: number) {
@@ -51,7 +50,7 @@ export default function FinanceiroScreen() {
   async function load() {
     try {
       setLoading(true);
-      const res = await listarParcelasAReceber();
+      const res = await listarParcelasVencendo();
       setData(res);
     } catch (e: any) {
       Alert.alert('Erro', e?.message ?? 'Falha ao carregar parcelas');
@@ -164,12 +163,12 @@ export default function FinanceiroScreen() {
           <View style={styles.card}>
             <View style={{ flex: 1 }}>
               <ThemedText type="defaultSemiBold">
-                {item.imovelTitulo ? item.imovelTitulo : `Imóvel #${item.imovelId}`}
+                {`Imóvel #${item.aluguel_id}`}
               </ThemedText>
               <Text style={{ opacity: 0.8 }}>Locatário: {item.locatario || '—'}</Text>
               <Text style={{ marginTop: 4 }}>{formatCurrency(item.valor)}</Text>
               <Text style={{ opacity: 0.7, marginTop: 2 }}>
-                Vence em {formatDate(item.vencimento)}
+                Vence em {formatDate(item.dataVencimento)}
               </Text>
               <Text style={{ marginTop: 4 }}>
                 {item.status === 'PAGA' ? 'Recebida' : 'Aberta'}

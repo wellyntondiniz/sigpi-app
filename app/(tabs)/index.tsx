@@ -2,6 +2,17 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 //import { getImoveis, getProximasParcelas, Imovel, Parcela } from '@/services/api';
+
+import {
+  Imovel,
+  listarImoveis,
+} from '@/service/imovel';
+
+import {
+  listarParcelasVencendo,
+  Parcela,
+} from '@/service/parcela';
+
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
@@ -17,8 +28,8 @@ export default function HomeScreen() {
     setError(null);
     try {
       const [imv, parc] = await Promise.all([
-        getImoveis(),
-        getProximasParcelas(5), // ajuste o limite se quiser
+        listarImoveis(),
+        listarParcelasVencendo(), 
       ]);
       setImoveis(imv);
       setParcelas(parc);
@@ -110,10 +121,7 @@ function ParcelaItem({ item }: { item: Parcela }) {
     <View style={styles.parcelaRow}>
       <View style={{ flex: 1 }}>
         <Text style={styles.parcelaTitulo}>
-          {item.imovelTitulo ?? `Imóvel #${item.imovelId}`}
-        </Text>
-        <Text style={styles.parcelaSub}>
-          {item.locatario ? `Locatário: ${item.locatario}` : '—'}
+          {item.numeroParcela ?? `Imovel: #${item.numeroParcela}`}
         </Text>
       </View>
       <View style={{ alignItems: 'flex-end' }}>
@@ -121,11 +129,18 @@ function ParcelaItem({ item }: { item: Parcela }) {
           {formatCurrency(item.valor)}
         </Text>
         <Text style={styles.parcelaData}>
-          {formatDate(item.vencimento)}
+          {formatDate(item.dataVencimento)}
         </Text>
       </View>
     </View>
   );
+}
+
+function formatDate(iso?: string) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString('pt-BR');
 }
 
 function formatCurrency(v: number) {
@@ -134,12 +149,6 @@ function formatCurrency(v: number) {
   } catch {
     return `R$ ${v?.toFixed?.(2) ?? v}`;
   }
-}
-
-function formatDate(iso: string) {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString('pt-BR');
 }
 
 const styles = StyleSheet.create({
