@@ -1,6 +1,7 @@
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Parcela, listarParcelasVencendo } from '@/service/parcela';
+import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -149,10 +150,10 @@ export default function FinanceiroScreen() {
   return (
     <ThemedView style={styles.container}>
       <View style={styles.header}>
-        <ThemedText type="title">Financeiro</ThemedText>
-        <Pressable onPress={onAdd} style={styles.primaryBtn}>
-          <ThemedText style={styles.btnText}>+ Nova parcela</ThemedText>
-        </Pressable>
+        <View style={styles.headerLeft}>
+          <Ionicons name="card" size={22} color="#2563eb" style={{ marginRight: 8 }} />
+          <ThemedText type="title">Financeiro</ThemedText>
+        </View>
       </View>
 
       <FlatList
@@ -263,6 +264,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, padding: 16, gap: 12 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  headerLeft: { flexDirection: 'row', alignItems: 'center' },
   sep: { height: 10 },
 
   card: {

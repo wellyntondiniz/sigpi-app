@@ -1,5 +1,5 @@
 
-const BASE_URL = 'http://192.168.68.107:4200/parcelas'; 
+const BASE_URL = 'http://192.168.68.104:4200/parcelas'; 
 
 export interface Parcela {
   id?: number;
